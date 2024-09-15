@@ -1,5 +1,5 @@
 {
-  "name": "digi_sih",
+  "name": "digi_sih_backend",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
