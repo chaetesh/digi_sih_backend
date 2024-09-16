@@ -4,9 +4,16 @@ import fitz  # PyMuPDF
 import os
 import sys
 import re
-import json
+import json  # For JSON output
 
+# Path to tesseract executable
 pytesseract.pytesseract.tesseract_cmd = r'tesseract'
+
+# Custom Tesseract OCR configuration
+# OEM 3 uses LSTM OCR engine; PSM 6 is for a block of text
+custom_config = r'--oem 3 --psm 6'
+
+# Convert PDF to images using PyMuPDF
 
 
 def convert_pdf_to_images(pdf_path, output_folder):
@@ -22,16 +29,21 @@ def convert_pdf_to_images(pdf_path, output_folder):
 
     return image_paths
 
+# Extract text from images using Tesseract-OCR
+
 
 def extract_text_from_images(image_paths):
     extracted_text = ""
 
     for image_path in image_paths:
         img = Image.open(image_path)
-        text = pytesseract.image_to_string(img)
+        text = pytesseract.image_to_string(
+            img, config=custom_config)  # Apply custom config
         extracted_text += text + "\n"
 
     return extracted_text
+
+# Function to split text into words based on multiple delimiters
 
 
 def split_text_into_words(text):
@@ -39,21 +51,25 @@ def split_text_into_words(text):
     words = [word.strip() for word in words if word.strip()]
     return words
 
+# Clean the extracted words
+
 
 def clean_text(word_list):
     cleaned_text = ' '.join(word_list)
     cleaned_text = cleaned_text.strip().lower()
     return cleaned_text
 
+# Extract caste information
+
 
 def extract_caste(text, caste_dict):
     for caste, category in caste_dict.items():
-        if re.search(rf'\b{re.escape(caste.lower())}\b', text, re.IGNORECASE):
+        if re.search(rf'\b{re.escape(caste.lower())}\b', text):
             return f"{caste} ({category})"
     return 'Caste not found'
 
 
-# Caste dictionary
+# Define a sample caste dictionary
 caste_dict = {
 
 
@@ -108,35 +124,31 @@ caste_dict = {
     'Soliga': 'ST', 'Jenukuruba': 'ST', 'Koraga': 'ST', 'Toda': 'ST', 'Siddis': 'ST', 'Paniya': 'ST',
     'Kurichiya': 'ST', 'Malayarayan': 'ST', 'Kadar': 'ST', 'Adiyan': 'ST'
 }
-# Main OCR processing function
-
-
-def process_ocr(file_path, output_folder):
-    _, file_extension = os.path.splitext(file_path)
-    file_extension = file_extension.lower()
-
-    if file_extension == ".pdf":
-        image_paths = convert_pdf_to_images(file_path, output_folder)
-        extracted_text = extract_text_from_images(image_paths)
-
-        for image_path in image_paths:
-            os.remove(image_path)
-    else:
-        img = Image.open(file_path)
-        img = img.convert('L')  # Preprocessing steps
-        img = img.filter(ImageFilter.SHARPEN)
-        img = ImageEnhance.Contrast(img).enhance(2)
-        extracted_text = pytesseract.image_to_string(img)
-
-    words = split_text_into_words(extracted_text)
-    cleaned_text = clean_text(words)
-    caste_info = extract_caste(cleaned_text, caste_dict)
-
-    return {"text": extracted_text, "caste_info": caste_info}
-
 
 if __name__ == "__main__":
     file_path = sys.argv[1]
     output_folder = sys.argv[2]
-    result = process_ocr(file_path, output_folder)
-    print(json.dumps(result))
+
+    # Process the file
+    _, file_extension = os.path.splitext(file_path)
+    if file_extension.lower() == ".pdf":
+        image_paths = convert_pdf_to_images(file_path, output_folder)
+        extracted_text = extract_text_from_images(image_paths)
+        for image_path in image_paths:
+            os.remove(image_path)
+    else:
+        img = Image.open(file_path)
+        extracted_text = pytesseract.image_to_string(
+            img, config=custom_config)  # Apply custom config
+
+    # Split, clean, and extract caste info
+    words = split_text_into_words(extracted_text)
+    cleaned_text = clean_text(words)
+    caste_info = extract_caste(cleaned_text, caste_dict)
+
+    # Output the results in JSON format
+    result = {
+        "text": extracted_text,
+        "caste": caste_info
+    }
+    print(json.dumps(result))  # Output JSON
